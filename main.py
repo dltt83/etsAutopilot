@@ -34,6 +34,35 @@ def getSaveSS():
 # END DEF
 
 
+def processImage(frame):
+    (thresh, frameBW) = cv2.threshold(frame, 150, 255, cv2.THRESH_BINARY)
+
+    leftSide = frameBW[0:100, 0:200]
+    rightSide = frameBW[0:100, 201:320]
+
+    # find average x position of white pixels
+    aveX = 0
+    whtNum = 0
+    for y in range(len(leftSide)):
+        for x in range(len(leftSide[0])):
+            if leftSide[y][x] == 255:
+                aveX = aveX + x
+                whtNum += 1
+    aveXL = aveX / whtNum
+
+    aveX = 0
+    whtNum = 0
+    for y in range(len(rightSide)):
+        for x in range(len(rightSide[0])):
+            if rightSide[y][x] == 255:
+                aveX = aveX + x
+                whtNum += 1
+    aveXR = aveX / whtNum
+
+    return aveXL, aveXR
+# END DEF
+
+
 # set hotkeys
 keyboard.add_hotkey("p", lambda: changeRun())
 keyboard.add_hotkey("l", lambda: stopLoop())
@@ -57,9 +86,10 @@ def main():
             ##### do calculations
 
             # get image
-            # image = pyautogui.screenshot(region=(750, 514, 320, 100))
+            frame = pyautogui.screenshot(region=(750, 514, 320, 100))
 
             # process image
+            aveXL, aveXR = processImage(frame)
 
             # determine action
 
