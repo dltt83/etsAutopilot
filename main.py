@@ -1,25 +1,49 @@
-import pygame
 import time
+import pyautogui
+import cv2
+import keyboard
 
-def update_display(win, running):
-    win.fill((0, 0, 0))
+# define global booleans for control flow
+global run 
+run = False
+global quitLoop
+quitLoop = False
 
-    if running:
-        print("running")
-        pygame.draw.rect(win, (255, 0, 0), (0, 40, 300, 20))
-    # END IF
 
-    pygame.display.update()
+#define hotkey functions
+def changeRun():
+    global run
+    run = not run
 # END DEF
 
-def main():
-    # create pygame window
-    pygame.init()
-    win = pygame.display.set_mode((300, 100))
+def stopLoop():
+    global quitLoop
+    quitLoop = True
+# END DEF
 
-    # define booleans for control flow
-    run = False
-    quitLoop = False
+
+# function to take screenshots of corrent region for use for openCV testing
+global ssNum
+ssNum = 0
+def getSaveSS():
+    global ssNum
+
+    image = pyautogui.screenshot(region=(750, 514, 320, 100))
+    image.save("testImage" + str(ssNum) + ".png")
+    ssNum += 1
+# END DEF
+
+
+# set hotkeys
+keyboard.add_hotkey("p", lambda: changeRun())
+keyboard.add_hotkey("l", lambda: stopLoop())
+keyboard.add_hotkey("o", lambda: getSaveSS())
+
+
+# main function
+def main():
+    # add global variables
+    global run, quitLoop
 
     # # initialise position variables
     # leftPos = 0
@@ -27,29 +51,23 @@ def main():
 
     # start loop
     while not quitLoop:
-        # get key presses
-        for event in pygame.event.get():
-            # if user closes window
-            if event.type == pygame.QUIT:
-                # stops loop and closes window
-                quitLoop = True
-                pygame.quit()
-            elif event.type == pygame.KEYDOWN:
-                # if user presses keypad 1
-                if event.key == pygame.K_KP1:
-                    # toggle system on/off
-                    run = not run
-                # END IF
-            # END IF
-        # END FOR
+        if run:
+            print("running")
 
+            ##### do calculations
 
-        # do calculations
+            # get image
+            # image = pyautogui.screenshot(region=(750, 514, 320, 100))
 
+            # process image
 
-        # update display
-        update_display(win, run)
+            # determine action
 
+            # do action
+
+        else:
+            print("not running")
+        # END IF
 
         time.sleep(0.2)
     # END WHILE
