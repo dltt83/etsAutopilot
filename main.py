@@ -52,6 +52,7 @@ def getSaveSS():
     print(end-start)
 # END DEF
 
+
 def updateDisplay(win, frame, aveXL, aveXR):
     win.fill((0, 0, 0))
 
@@ -63,8 +64,8 @@ def updateDisplay(win, frame, aveXL, aveXR):
     win.blit(py_image, (0,0))
 
     pygame.draw.rect(win, (255, 0, 0), pygame.Rect(aveXL, 0, 1, 100))
-    pygame.draw.rect(win, (255, 0, 0), pygame.Rect(aveXR+200, 0, 1, 100))
-    pygame.draw.rect(win, (0, 255, 0), pygame.Rect(200, 0, 1, 100))
+    pygame.draw.rect(win, (0, 255, 0), pygame.Rect(aveXR+200, 0, 1, 100))
+    pygame.draw.rect(win, (0, 0, 255), pygame.Rect(200, 0, 1, 100))
     
     pygame.display.update()
 # END DEF
@@ -79,28 +80,31 @@ def processImage(frame, win):
 
     # find average x position of white pixels
     aveXL = 0
-    whtNum = 0
+    whtNumL = 0
     for y in range(len(leftSide)):
         for x in range(len(leftSide[0])):
             if leftSide[y][x] == 255:
                 aveXL = aveXL + x
-                whtNum += 1
+                whtNumL += 1
     #END FOR
 
     aveXR = 0
-    whtNum = 0
+    whtNumR = 0
     for y in range(len(rightSide)):
         for x in range(len(rightSide[0])):
             if rightSide[y][x] == 255:
                 aveXR = aveXR + x
-                whtNum += 1
+                whtNumR += 1
     # END FOR
 
-    if whtNum > 0:
-        aveXL = aveXL / whtNum
-        aveXR = aveXR / whtNum
+    if whtNumL > 0:
+        aveXL = aveXL / whtNumL
     else:
         aveXL = LEFT_BASE
+    # END IF
+    if whtNumR > 0:
+        aveXR = aveXR / whtNumR
+    else:
         aveXR = RIGHT_BASE
     # END IF
 
@@ -128,10 +132,6 @@ def main():
     # start loop
     while not quitLoop:
         if run:
-            print("running")
-
-            ##### do calculations
-
             # get image
             screenshot = pyautogui.screenshot(region=(750, 514, 320, 100))
             # convert to np and grayscale
@@ -145,6 +145,7 @@ def main():
             rOffset = aveXR - RIGHT_BASE
 
             netOffset = lOffset + rOffset
+            print(aveXL, aveXR)
             print(netOffset)
 
             # do action
