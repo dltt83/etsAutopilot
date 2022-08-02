@@ -31,28 +31,6 @@ def stopLoop():
 # END DEF
 
 
-##### TEST FUNCTION to take screenshots of corrent region for use for openCV testing
-global ssNum
-ssNum = 0
-def getSaveSS():
-    global ssNum
-    ssNum += 1
-
-    start = time.perf_counter()
-    image = pyautogui.screenshot(region=(750, 514, 320, 100))
-    image.save("testImage" + str(ssNum) + ".png")
-
-    img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
-    cv2.imwrite("testImageGRAY" + str(ssNum) + ".png", img)
-
-    aveXL, aveXR, frameBW = processImage(img)
-    cv2.imwrite("testImageBW" + str(ssNum) + ".png", frameBW)
-    end = time.perf_counter()
-
-    print(end-start)
-# END DEF
-
-
 def updateDisplay(win, frame, aveXL, aveXR):
     win.fill((0, 0, 0))
 
@@ -113,10 +91,58 @@ def processImage(frame, win):
 # END DEF
 
 
+def processImageForLines(frame, win):
+    # apply gaussian blur to image
+    kernel_size = 5
+    blurFrame = cv2.GaussianBlur(frame ,(kernel_size, kernel_size),0)
+
+    # convert image to binary black and white
+    (thresh, frameBW) = cv2.threshold(blurFrame, 180, 255, cv2.THRESH_BINARY)
+
+    # use canny edge detection
+    low_threshold = 50
+    high_threshold = 150
+    edges = cv2.Canny(frameBW, low_threshold, high_threshold)
+
+    rho = 1  # distance resolution in pixels of the Hough grid
+    theta = np.pi / 180  # angular resolution in radians of the Hough grid
+    threshold = 15  # minimum number of votes (intersections in Hough grid cell)
+    min_line_length = 20  # minimum number of pixels making up a line
+    max_line_gap = 60  # maximum gap in pixels between connectable line segments
+    line_image = np.copy(frameBW) * 0  # creating a blank to draw lines on
+
+    # Run Hough on edge detected image
+    # Output "lines" is an array containing endpoints of detected line segments
+    lines = cv2.HoughLinesP(edges, rho, theta, threshold, np.array([]), min_line_length, max_line_gap)
+
+    for line in lines:
+        for x1,y1,x2,y2 in line:
+            cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
+    
+    lines_edges = cv2.addWeighted(frameBW, 0.8, line_image, 1, 0)
+
+    
+    # update pygame window with information
+    win.fill((0, 0, 0))
+
+    # img = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+    im_pil = Image.fromarray(lines_edges)
+
+    py_image = pygame.image.fromstring(im_pil.tobytes(), im_pil.size, im_pil.mode)
+
+    win.blit(py_image, (0,0))
+
+    # pygame.draw.rect(win, (255, 0, 0), pygame.Rect(aveXL, 0, 1, 100))
+    # pygame.draw.rect(win, (0, 255, 0), pygame.Rect(aveXR+200, 0, 1, 100))
+    # pygame.draw.rect(win, (0, 0, 255), pygame.Rect(200, 0, 1, 100))
+    
+    pygame.display.update()
+# END DEF
+
+
 # set hotkeys
-keyboard.add_hotkey("p", lambda: changeRun())
+keyboard.add_hotkey("#", lambda: changeRun())
 keyboard.add_hotkey("l", lambda: stopLoop())
-keyboard.add_hotkey("o", lambda: getSaveSS())
 
 
 # main function
@@ -137,19 +163,27 @@ def main():
             # convert to np and grayscale
             frame = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2GRAY)
 
-            # process image
-            aveXL, aveXR = processImage(frame, win)
+            # # ==========
+            # # process image
+            # aveXL, aveXR = processImage(frame, win)
 
-            # determine action
-            lOffset = aveXL - LEFT_BASE
-            rOffset = aveXR - RIGHT_BASE
+            # # determine action
+            # lOffset = aveXL - LEFT_BASE
+            # rOffset = aveXR - RIGHT_BASE
 
-            netOffset = lOffset + rOffset
-            print(aveXL, aveXR)
-            print(netOffset)
+            # netOffset = lOffset + rOffset
+            # print(aveXL, aveXR)
+            # print(netOffset)
 
-            # do action
+            # # do action
+            # if netOffset < -50:
+            #     keyboard.press("a")
+            # elif netOffset > 50:
+            #     keyboard.press("d")
+            # # END IF
+            # # ==========
 
+            processImageForLines(frame, win)
         else:
             print("not running")
         # END IF
@@ -160,7 +194,10 @@ def main():
                 pygame.quit()
         # END FOR
 
-        time.sleep(0.2)
+        time.sleep(0.03)
+        keyboard.release("a")
+        keyboard.release("d")
+        time.sleep(0.17)
     # END WHILE
 # END DEF
 
