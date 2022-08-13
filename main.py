@@ -1,3 +1,4 @@
+import csv
 import pyautogui
 import cv2
 import keyboard
@@ -7,12 +8,12 @@ from PIL import Image
 
 global run 
 global quitLoop
-global LEFT_BASE
-global RIGHT_BASE
+global recording
 
 # define booleans for control flow
 run = False
 quitLoop = False
+recording = False
 
 #define hotkey functions
 def changeRun():
@@ -26,15 +27,36 @@ def stopLoop():
     quitLoop = True
 # END DEF
 
+def changeRecording():
+    global recording
+    recording = not recording
+# END DEF
+
 
 # set hotkeys
 keyboard.add_hotkey("#", lambda: changeRun())
 keyboard.add_hotkey("l", lambda: stopLoop())
+keyboard.add_hotkey("'", lambda: changeRecording())
 
 
-def updateDisplay(frame, win, wheelPos):
+def updateDisplay(frame, win, wheelPos, lines, goodLines, roadPos):
+    global recording
+
     # update pygame window with information
     win.fill((0, 0, 0))
+
+    # draw lines detected onto frame
+    for line in lines:
+        for x1,y1,x2,y2 in line:
+            cv2.line(frame,(x1,y1),(x2,y2),(255,0,0),1)
+        # END FOR
+    # END FOR
+
+    for line in goodLines:
+        for x1,y1,x2,y2 in line:
+            cv2.line(frame,(x1,y1),(x2,y2),(0,255,0),1)
+        # END FOR
+    # END FOR
 
     # img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     im_pil = Image.fromarray(frame)
@@ -44,18 +66,50 @@ def updateDisplay(frame, win, wheelPos):
     win.blit(py_image, (0,0))
 
     if wheelPos < 0:
-        pygame.draw.rect(win, (255, 0, 0), pygame.Rect((210+wheelPos*10), 158, wheelPos*-10, 30))
+        pygame.draw.rect(win, (255, 0, 0), pygame.Rect((210+wheelPos*10), 158, wheelPos*-10, 15))
     elif wheelPos > 0:
-        pygame.draw.rect(win, (255, 0, 0), pygame.Rect(210, 158, wheelPos*10, 30))
+        pygame.draw.rect(win, (255, 0, 0), pygame.Rect(210, 158, wheelPos*10, 15))
     # END IF
 
+    if roadPos < 0:
+        pygame.draw.rect(win, (0, 0, 255), pygame.Rect((210+roadPos*200), 173, roadPos*-200, 15))
+    elif roadPos > 0:
+        pygame.draw.rect(win, (0, 0, 255), pygame.Rect(210, 173, roadPos*200, 15))
+    # END IF
+
+    if recording:
+        pygame.draw.rect(win, (0, 255, 0), pygame.Rect(0, 170, 10, 10))
+    # END IF
     
     pygame.display.update()
 # END DEF
 
 
-def processImageForLines(frame, win):
-    print("processing")
+def processImageForLines(frame):
+    # apply gaussian blur to image
+    kernel_size = 5
+    blurFrame = cv2.GaussianBlur(frame ,(kernel_size, kernel_size),0)
+
+    # use canny edge detection
+    low_threshold = 50
+    high_threshold = 150
+    edges = cv2.Canny(blurFrame, low_threshold, high_threshold)
+
+    rho = 1  # distance resolution in pixels of the Hough grid
+    theta = np.pi / 180  # angular resolution in radians of the Hough grid
+    threshold = 22  # minimum number of votes (intersections in Hough grid cell)
+    min_line_length = 20  # minimum number of pixels making up a line
+    max_line_gap = 60  # maximum gap in pixels between connectable line segments
+
+    # Run Hough on edge detected image
+    # Output "lines" is an array containing endpoints of detected line segments
+    lines = cv2.HoughLinesP(edges, rho, theta, threshold, np.array([]), min_line_length, max_line_gap)
+
+    if lines is not None:
+        return lines
+    else:
+        return []
+    # END IF
 # END DEF
 
 def getWheelPosition(frame):
@@ -78,6 +132,35 @@ def getWheelPosition(frame):
 # END DEF
 
 
+def processLines(lines):
+    gradientList = []
+    goodLines = []
+
+    for line in lines:
+        for x1,y1, x2,y2 in line:
+            # get gradient of line
+            delX = x1-x2
+            delY = y1-y2
+
+            if delY != 0:
+                gradient = delX/delY
+                if abs(gradient) < 1:
+                    gradientList.append(gradient)
+                    goodLines.append(line)
+                # END IF
+            # END IF
+        # END FOR
+    # END FOR
+
+    if len(gradientList) > 0:
+        aveGradient = sum(gradientList) / len(gradientList)
+        return aveGradient, goodLines
+    else:
+        return 0, []
+    # END IF
+# EN DEF
+
+
 # main function
 def main():
     screenshotDimensions = (700, 450, 700, 600)
@@ -88,9 +171,13 @@ def main():
     pygame.display.update()
 
     # add global variables
-    global run, quitLoop
+    global run, quitLoop, recording
 
     badFrames = 0
+
+    file = open("steerdata.csv", "a", newline="")
+    writer = csv.writer(file)
+    
 
     # start loop
     while not quitLoop:
@@ -100,16 +187,31 @@ def main():
             # convert to np and grayscale
             frame = np.array(screenshot)
 
-            # print(sum(frame[508][176]))
+            # check if frame is bad (all black)
             if sum(frame[508][176]) == 0:
                 badFrames += 1
                 print("badFrame", badFrames)
             else:
+                # run processing as frame is good
+
+                # get frame with just road on
                 roadFrame = frame[0:158, 0:420]
-                # processImageForLines(roadFrame, win)
+
+                # process image to find lines
+                lines = processImageForLines(roadFrame)
+
+                # get estimated road direction from lines
+                roadPos, goodLines = processLines(lines)
+
+                # get wheel position
                 wheelPos = getWheelPosition(frame)
 
-                updateDisplay(roadFrame, win, wheelPos)
+                if recording:
+                    writer.writerow([roadPos, wheelPos])
+                # END IF
+
+                # update display
+                updateDisplay(roadFrame, win, wheelPos, lines, goodLines, roadPos)
             # END IF
         # END IF
 
